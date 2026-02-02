@@ -1,4 +1,4 @@
-﻿using CommentViewerCommon;
+using CommentViewerCommon;
 using Common;
 using MultiCommentViewer.Test;
 using System;
@@ -19,10 +19,20 @@ namespace MultiCommentViewer
     class Program
     {
         static ILogger _logger;
+
+        // 診断用：起動時にメッセージボックスを表示
+        private static void ShowDiagnosticMessage(string message)
+        {
+            Console.WriteLine($"[DIAGNOSTIC] {message}");
+            System.Diagnostics.Debug.WriteLine($"[DIAGNOSTIC] {message}");
+        }
+
         [STAThread]
-        //static async Task Main(string[] args)
         static void Main()
         {
+            // 起動直後の診断メッセージ
+            ShowDiagnosticMessage("Program.Main() started - Modified version");
+
             _logger = new Common.LoggerTest();
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             var app = new AppNoStartupUri
@@ -42,6 +52,7 @@ namespace MultiCommentViewer
             Handle(t);
             app.Run();
         }
+
         static async void Handle(Task t)
         {
             try
@@ -50,31 +61,38 @@ namespace MultiCommentViewer
             }
             catch (Exception ex)
             {
+                ShowDiagnosticMessage($"Exception in Handle: {ex.Message}");
                 Debug.WriteLine(ex.Message);
                 _logger.LogException(ex);
             }
         }
+
         private string GetOptionsPath()
         {
             var currentDir = Directory.GetParent(Assembly.GetExecutingAssembly().Location).FullName;
             return Path.Combine(currentDir, "settings", "options.txt");
         }
+
+        private string GetEnabledPluginsPath()
+        {
+            var currentDir = Directory.GetParent(Assembly.GetExecutingAssembly().Location).FullName;
+            var path = Path.Combine(currentDir, "settings", "enabled_plugins.json");
+            ShowDiagnosticMessage($"GetEnabledPluginsPath: {path}");
+            return path;
+        }
+
         public async Task StartAsync()
         {
+            ShowDiagnosticMessage("StartAsync() called");
+
             var io = new Test.IOTest();
-            //settingsディレクトリの有無を確認し、無ければ作成する
             const string SettingsDirName = "settings";
             if (!Directory.Exists(SettingsDirName))
             {
                 Directory.CreateDirectory(SettingsDirName);
+                ShowDiagnosticMessage("Created settings directory");
             }
-            //OptionsはMainViewModelのContentRendered()で読み込みたい。しかし、その前にConnectionNameWidth等が参照されるため現状ではコンストラクタ以前に読み込む必要がある。
-            //実行される順番は
-            //ctor->ConnectionNameWidth->Activated->Loaded->ContentRendered
-            //理想は、とりあえずViewを表示して、そこに"読み込み中です"みたいな表示を出している間に必要なものを読み込むこと。
-            //しかし、それをやるにはViewの位置はデフォルト値になってしまう。それでも良いか。            
-            //これ↓が一番いいかも
-            //ここでOptionsのインスタンスを作成し、MainViewModelに渡す。とりあえずデフォルト値で初期化させ、ContentRenderedで保存されたOptionsを読み込み差し替える。
+
             var options = new DynamicOptionsTest();
             try
             {
@@ -85,16 +103,77 @@ namespace MultiCommentViewer
             {
                 _logger.LogException(ex);
             }
-            try
+
+            // サイトプラグイン設定を読み込み
+            var enabledPluginsPath = GetEnabledPluginsPath();
+            EnabledSitePluginsOptions enabledPluginsOptions;
+
+            ShowDiagnosticMessage($"Checking file: {enabledPluginsPath}");
+            ShowDiagnosticMessage($"File exists: {File.Exists(enabledPluginsPath)}");
+
+            if (!File.Exists(enabledPluginsPath))
             {
-                SendErrorFile();
+                ShowDiagnosticMessage("Settings file NOT found. Showing wizard...");
+
+                // ウィザードを表示
+                var wizard = new SitePluginSelectorWizard()
+                {
+                    Title = "接続するサイトを選択（初回起動）"
+                };
+
+                var result = wizard.ShowDialog();
+
+                if (result == true && wizard.Result != null)
+                {
+                    enabledPluginsOptions = wizard.Result;
+
+                    // settingsフォルダを確実に作成
+                    var settingsDir = Path.GetDirectoryName(enabledPluginsPath);
+                    if (!Directory.Exists(settingsDir))
+                    {
+                        Directory.CreateDirectory(settingsDir);
+                        ShowDiagnosticMessage($"Created directory: {settingsDir}");
+                    }
+
+                    enabledPluginsOptions.Save(enabledPluginsPath);
+                    ShowDiagnosticMessage($"Wizard completed. Saved to: {enabledPluginsPath}");
+                    ShowDiagnosticMessage($"Selected {enabledPluginsOptions.EnabledPlugins.Count} sites");
+                }
+                else
+                {
+                    ShowDiagnosticMessage("Wizard cancelled. Loading all sites.");
+                    enabledPluginsOptions = EnabledSitePluginsOptions.CreateAllEnabled();
+
+                    var settingsDir = Path.GetDirectoryName(enabledPluginsPath);
+                    if (!Directory.Exists(settingsDir))
+                    {
+                        Directory.CreateDirectory(settingsDir);
+                    }
+                    enabledPluginsOptions.Save(enabledPluginsPath);
+                }
             }
-            catch { }
-            ISitePluginLoader sitePluginLoader = new Test.SitePluginLoaderTest();
+            else
+            {
+                ShowDiagnosticMessage("Settings file found. Loading...");
+                enabledPluginsOptions = EnabledSitePluginsOptions.Load(enabledPluginsPath);
+
+                ShowDiagnosticMessage($"IsInitialSetupCompleted: {enabledPluginsOptions.IsInitialSetupCompleted}");
+                ShowDiagnosticMessage($"EnabledPlugins count: {enabledPluginsOptions.EnabledPlugins?.Count ?? 0}");
+
+                // 設定が不正な場合は全サイトを有効にする
+                if (enabledPluginsOptions.EnabledPlugins == null || enabledPluginsOptions.EnabledPlugins.Count == 0)
+                {
+                    ShowDiagnosticMessage("WARNING: EnabledPlugins is empty. Loading all sites as fallback.");
+                    enabledPluginsOptions = EnabledSitePluginsOptions.CreateAllEnabled();
+                }
+            }
+
+            ShowDiagnosticMessage($"Creating SitePluginLoaderTest with {enabledPluginsOptions.EnabledPlugins.Count} enabled plugins");
+
+            // SitePluginLoaderに設定を渡す
+            ISitePluginLoader sitePluginLoader = new Test.SitePluginLoaderTest(enabledPluginsOptions);
             IBrowserLoader browserLoader = new BrowserLoader(_logger);
-            //var model = new Model(new SitePluginLoaderTest(), options, _logger, io);
-            //(IIo io, ILogger logger, IOptions options, ISitePluginLoader sitePluginLoader, IBrowserLoader browserLoader)
-            //var viewModel = new MainViewModel(model);
+
             var viewModel = new MainViewModel(io, _logger, options, sitePluginLoader, browserLoader);
             viewModel.CloseRequested += ViewModel_CloseRequested;
 
@@ -111,22 +190,7 @@ namespace MultiCommentViewer
                 {
                     _logger.LogException(ex);
                 }
-                try
-                {
-                    var s = _logger.GetExceptions();
-                    SendErrorReport(s, GetTitle(), GetVersion());
-                }
-                catch (Exception ex)
-                {
-                    //ここで例外が起きても送れない・・・。
-                    Debug.WriteLine(ex.Message);
-                }
             }
-
-            //SplashScreen splashScreen = new SplashScreen();  //not disposable, but I'm keeping the same structure
-            //{
-            //    splashScreen.Closed += windowClosed; //if user closes splash screen, let's quit
-            //    splashScreen.Show();
 
             await viewModel.InitializeAsync();
 
@@ -135,10 +199,7 @@ namespace MultiCommentViewer
             mainForm.DataContext = viewModel;
             mainForm.Show();
 
-            //    splashScreen.Owner = mainForm;
-            //    splashScreen.Closed -= windowClosed;
-            //    splashScreen.Close();
-            //}
+            ShowDiagnosticMessage("MainWindow shown");
         }
 
         public event EventHandler<EventArgs> ExitRequested;
@@ -151,6 +212,7 @@ namespace MultiCommentViewer
         {
             ExitRequested?.Invoke(this, e);
         }
+
         private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             var ex = e.ExceptionObject as Exception;
@@ -165,63 +227,6 @@ namespace MultiCommentViewer
                 }
             }
             catch { }
-        }
-        private string GetTitle()
-        {
-            var asm = System.Reflection.Assembly.GetExecutingAssembly();
-            var title = asm.GetName().Name;
-            return title;
-        }
-        private string GetVersion()
-        {
-            var asm = System.Reflection.Assembly.GetExecutingAssembly();
-            var ver = asm.GetName().Version;
-            var s = $"v{ver.Major}.{ver.Minor}.{ver.Build}";
-            return s;
-        }
-        /// <summary>
-        /// エラー情報をサーバに送信する
-        /// </summary>
-        /// <param name="errorData"></param>
-        /// <param name="title"></param>
-        /// <param name="version"></param>
-        private void SendErrorReport(string errorData, string title, string version)
-        {
-            if (string.IsNullOrEmpty(errorData))
-            {
-                return;
-            }
-            var fileStreamContent = new StreamContent(new System.IO.MemoryStream(Encoding.UTF8.GetBytes(errorData)));
-            using (var client = new HttpClient())
-            using (var formData = new MultipartFormDataContent())
-            {
-                client.DefaultRequestHeaders.Add("User-Agent", $"{title} {version}");
-                formData.Add(fileStreamContent, "error", title + "_" + version + "_" + "error.txt");
-                var t = client.PostAsync("https://int-main.net/upload", formData);
-                var response = t.Result;
-                if (!response.IsSuccessStatusCode)
-                {
-                }
-                else
-                {
-                }
-            }
-        }
-        /// <summary>
-        /// error.txtがあったらサーバに送信して削除する
-        /// </summary>
-        private void SendErrorFile()
-        {
-            if (System.IO.File.Exists("error.txt"))
-            {
-                string errorContent;
-                using (var sr = new System.IO.StreamReader("error.txt"))
-                {
-                    errorContent = sr.ReadToEnd();
-                }
-                SendErrorReport(errorContent, GetTitle(), GetVersion());
-                System.IO.File.Delete("error.txt");
-            }
         }
     }
 }

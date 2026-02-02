@@ -15,6 +15,10 @@
     <Grid>
         <local:CommentDataGrid IsShowUserInfoMenuItem="False" ForceShowInvisibleComments="True" HorizontalAlignment="Stretch" Margin="0,180,0,0" VerticalAlignment="Stretch" Width="Auto"/>
         <CheckBox Content="NGユーザ" IsChecked="{Binding IsNgUser, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="335,6,0,0" />
+
+        <CheckBox Content="このユーザーを読み上げない" 
+          IsChecked="{Binding IsMuteSpeech, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+          HorizontalAlignment="Left" VerticalAlignment="Top" Margin="335,26,0,0" />
         <CheckBox Content="サイトNGユーザ" Visibility="Hidden" IsChecked="{Binding IsSiteNgUser}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="335,31,0,0" />
         <CheckBox Content="背景色を変更" IsChecked="{Binding IsEnabledUserBackColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Left" Margin="335,65,0,0" VerticalAlignment="Top"/>
         <xctk:ColorPicker SelectedColor="{Binding BackColor, Mode=TwoWay}" Margin="360,85,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Width="75" />

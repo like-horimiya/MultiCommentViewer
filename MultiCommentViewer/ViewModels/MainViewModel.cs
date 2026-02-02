@@ -1,18 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using GalaSoft.MvvmLight.Command;
 using System.Windows.Input;
 using SitePlugin;
-using System.Threading;
 using System.Collections.ObjectModel;
 using Plugin;
 using System.Diagnostics;
 using System.Windows.Threading;
 using System.Windows.Media;
-using System.Reflection;
 using System.ComponentModel;
 using MultiCommentViewer.Test;
 using Common;
@@ -23,7 +20,6 @@ using SitePluginCommon;
 using System.Windows;
 using System.Windows.Controls;
 using NicoSitePlugin;
-using MixchSitePlugin;
 
 namespace MultiCommentViewer
 {
@@ -1090,7 +1086,7 @@ namespace MultiCommentViewer
         }
         private string GetUserAgent()
         {
-            return $"{GetAppName()}/{GetVersionNumber()} contact-> twitter.com/kv510k";
+            return $"{GetAppName()}/{GetVersionNumber()} (contact, twitter.com/kv510k, Fork author, DaisukeDaisuke/MultiCommentViewer)";
         }
         public string Title
         {
@@ -1375,7 +1371,9 @@ namespace MultiCommentViewer
         }
         private string GetUrlFromSelectedComment()
         {
-            var selectedComment = SelectedComment;
+            // CopyComment と同じ理由
+            var commentDataGrid = GetActiveWindowContextAsCommentDataGrid();
+            var selectedComment = commentDataGrid.SelectedComment;
             if (selectedComment == null)
             {
                 return null;
@@ -1385,28 +1383,42 @@ namespace MultiCommentViewer
             {
                 return null;
             }
-            var match = Regex.Match(message, "(https?://([\\w-]+.)+[\\w-]+(?:/[\\w- ./?%&=]))?");
+            var match = Regex.Match(message, @"https?://[\w.-]+(?:/[\w./?%&=-]*)?");
             if (match.Success)
             {
-                return match.Groups[1].Value;
+                return match.Value;
             }
             return null;
         }
         private void OpenUrl()
         {
             var url = GetUrlFromSelectedComment();
+            if (url == null) return;
             Process.Start(url);
             SetSystemInfo("open: " + url, InfoType.Debug);
         }
         private void CopyComment()
         {
-            var message = SelectedComment.MessageItems.ToText();
+            // 本当はこのModel (this) が CommentDataGridViewModelBase を継承しているのでこんなのは不要だが
+            // CommentDataGrid 用のコードが UserView に無いのでこうなっている (中途半端な共通化の埋め合わせ)
+            var commentDataGrid = GetActiveWindowContextAsCommentDataGrid();
+
+            var message = commentDataGrid.SelectedComment.MessageItems.ToText();
             try
             {
                 System.Windows.Clipboard.SetText(message);
             }
             catch (System.Runtime.InteropServices.COMException) { }
             SetSystemInfo("copy: " + message, InfoType.Debug);
+        }
+        
+        private static CommentDataGridViewModelBase GetActiveWindowContextAsCommentDataGrid()
+        {
+            var activeWindow = Application.Current.Windows
+                .OfType<Window>()
+                .SingleOrDefault(x => x.IsActive);
+
+            return activeWindow.DataContext as CommentDataGridViewModelBase;
         }
         #region ConnectionsView
         #region ConnectionsViewSelection

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -210,6 +210,22 @@ namespace MultiCommentViewer
         private bool Test(ScrollChangedEventArgs e)
         {
             return e.ViewportHeightChange > 0 || e.ExtentHeightChange > 0 || e.ViewportHeightChange < 0 || e.ExtentHeightChange < 0;
+        }
+
+        /// <summary>
+        /// 接続するサイトを変更
+        /// </summary>
+        private void ChangeSitePlugins_Click(object sender, RoutedEventArgs e)
+        {
+            SitePluginMenuHelper.OpenSitePluginSelector();
+        }
+
+        /// <summary>
+        /// 有効なサイトを確認
+        /// </summary>
+        private void ShowEnabledSites_Click(object sender, RoutedEventArgs e)
+        {
+            SitePluginMenuHelper.ShowEnabledSites();
         }
     }
     public static class DataGridBehavior

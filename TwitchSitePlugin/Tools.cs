@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.Linq;
@@ -194,7 +194,17 @@ namespace TwitchSitePlugin
                 }
                 else
                 {
-                    actual.Add(new MessageImage { Url = $"https://static-cdn.jtvnw.net/emoticons/v1/{m.Emot.Id}/1.0", Alt = m.Message, Height = 28, Width = 28 });
+                    // アニメーション対応エモートを作成
+                    // Twitch API v2はアニメーションGIFをサポート
+                    actual.Add(new AnimatedMessageImage
+                    {
+                        Url = $"https://static-cdn.jtvnw.net/emoticons/v2/{m.Emot.Id}/default/dark/1.0",
+                        Alt = m.Message,
+                        Height = 28,
+                        Width = 28,
+                        EmoteId = m.Emot.Id,
+                        IsAnimated = true  // Twitch v2エモートは基本的にアニメーション対応
+                    });
                 }
             }
             return actual;

@@ -39,6 +39,17 @@ namespace MultiCommentViewer
 
             }
         }
+        // UserViewModel.cs 内に追加
+        public bool IsMuteSpeech
+        {
+            get { return _user.IsMuteSpeech; }
+            set
+            {
+                _user.IsMuteSpeech = value;
+                RaisePropertyChanged(nameof(IsMuteSpeech));
+            }
+        }
+
         public bool IsEnabledUserBackColor
         {
             get { return !string.IsNullOrEmpty(_user.BackColorArgb); }
